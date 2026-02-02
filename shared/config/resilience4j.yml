@@ -1,0 +1,172 @@
+# Resilience4j Configuration
+# Circuit Breakers, Bulkheads, Retry, and Rate Limiting
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      orderService:
+        registerHealthIndicator: true
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - com.sagaflow.exceptions.ServiceException
+          - java.util.concurrent.TimeoutException
+        ignoreExceptions:
+          - com.sagaflow.exceptions.ValidationException
+
+      inventoryService:
+        registerHealthIndicator: true
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+
+      paymentService:
+        registerHealthIndicator: true
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 15s  # Longer wait for payment gateway
+        failureRateThreshold: 40  # More sensitive for payment failures
+        eventConsumerBufferSize: 10
+
+      paymentGateway:
+        registerHealthIndicator: true
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s  # External service, longer recovery
+        failureRateThreshold: 30
+        slowCallRateThreshold: 60
+        slowCallDurationThreshold: 2s
+
+  bulkhead:
+    instances:
+      orderService:
+        maxConcurrentCalls: 100
+        maxWaitDuration: 5s
+
+      inventoryService:
+        maxConcurrentCalls: 150  # Higher for read-heavy service
+        maxWaitDuration: 3s
+
+      paymentService:
+        maxConcurrentCalls: 50  # Lower for critical payment operations
+        maxWaitDuration: 10s
+
+  thread-pool-bulkhead:
+    instances:
+      orderService:
+        maxThreadPoolSize: 20
+        coreThreadPoolSize: 10
+        queueCapacity: 100
+        keepAliveDuration: 20s
+
+      inventoryService:
+        maxThreadPoolSize: 30
+        coreThreadPoolSize: 15
+        queueCapacity: 150
+        keepAliveDuration: 20s
+
+      paymentService:
+        maxThreadPoolSize: 15
+        coreThreadPoolSize: 8
+        queueCapacity: 50
+        keepAliveDuration: 30s
+
+  retry:
+    instances:
+      orderService:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.util.concurrent.TimeoutException
+          - java.net.ConnectException
+        ignoreExceptions:
+          - com.sagaflow.exceptions.ValidationException
+
+      inventoryService:
+        maxAttempts: 3
+        waitDuration: 300ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - org.springframework.dao.OptimisticLockingFailureException
+          - java.util.concurrent.TimeoutException
+
+      paymentService:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - java.net.SocketTimeoutException
+          - com.sagaflow.exceptions.TransientPaymentException
+
+      paymentGateway:
+        maxAttempts: 3
+        waitDuration: 2s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+
+  ratelimiter:
+    instances:
+      orderService:
+        limitForPeriod: 500
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+
+      inventoryService:
+        limitForPeriod: 1000  # Higher limit for read operations
+        limitRefreshPeriod: 1s
+        timeoutDuration: 3s
+
+      paymentService:
+        limitForPeriod: 200  # More conservative for payments
+        limitRefreshPeriod: 1s
+        timeoutDuration: 10s
+
+  timelimiter:
+    instances:
+      orderService:
+        timeoutDuration: 5s
+        cancelRunningFuture: true
+
+      inventoryService:
+        timeoutDuration: 3s
+        cancelRunningFuture: true
+
+      paymentService:
+        timeoutDuration: 10s
+        cancelRunningFuture: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

@@ -1,0 +1,222 @@
+syntax = "proto3";
+
+package sagaflow;
+
+option java_package = "com.sagaflow.proto";
+option java_multiple_files = true;
+
+// ==================== Common Messages ====================
+
+message OrderItem {
+  string product_id = 1;
+  int32 quantity = 2;
+  double price = 3;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  string zip_code = 4;
+  string country = 5;
+}
+
+// ==================== Order Service ====================
+
+service OrderService {
+  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc UpdateOrderStatus(UpdateOrderStatusRequest) returns (UpdateOrderStatusResponse);
+}
+
+message CreateOrderRequest {
+  string customer_id = 1;
+  repeated OrderItem items = 2;
+  Address shipping_address = 3;
+  double total_amount = 4;
+}
+
+message CreateOrderResponse {
+  string order_id = 1;
+  string status = 2;
+  int64 created_at = 3;
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message GetOrderResponse {
+  string order_id = 1;
+  string customer_id = 2;
+  repeated OrderItem items = 3;
+  string status = 4;
+  double total_amount = 5;
+  int64 created_at = 6;
+  int64 updated_at = 7;
+}
+
+message CancelOrderRequest {
+  string order_id = 1;
+  string reason = 2;
+}
+
+message CancelOrderResponse {
+  string order_id = 1;
+  string status = 2;
+  int64 cancelled_at = 3;
+}
+
+message UpdateOrderStatusRequest {
+  string order_id = 1;
+  string status = 2;
+}
+
+message UpdateOrderStatusResponse {
+  string order_id = 1;
+  string status = 2;
+  int64 updated_at = 3;
+}
+
+// ==================== Inventory Service ====================
+
+service InventoryService {
+  rpc ReserveInventory(ReserveInventoryRequest) returns (ReserveInventoryResponse);
+  rpc ReleaseReservation(ReleaseReservationRequest) returns (ReleaseReservationResponse);
+  rpc CommitReservation(CommitReservationRequest) returns (CommitReservationResponse);
+  rpc GetAvailableStock(GetAvailableStockRequest) returns (GetAvailableStockResponse);
+}
+
+message ReserveInventoryRequest {
+  string order_id = 1;
+  repeated OrderItem items = 2;
+}
+
+message ReserveInventoryResponse {
+  string reservation_id = 1;
+  string status = 2;
+  int64 expires_at = 3;
+}
+
+message ReleaseReservationRequest {
+  string reservation_id = 1;
+}
+
+message ReleaseReservationResponse {
+  string reservation_id = 1;
+  string status = 2;
+  int64 released_at = 3;
+}
+
+message CommitReservationRequest {
+  string reservation_id = 1;
+}
+
+message CommitReservationResponse {
+  string reservation_id = 1;
+  string status = 2;
+  int64 committed_at = 3;
+}
+
+message GetAvailableStockRequest {
+  string product_id = 1;
+}
+
+message GetAvailableStockResponse {
+  string product_id = 1;
+  int32 available_quantity = 2;
+  int32 reserved_quantity = 3;
+}
+
+// ==================== Payment Service ====================
+
+service PaymentService {
+  rpc ProcessPayment(ProcessPaymentRequest) returns (ProcessPaymentResponse);
+  rpc RefundPayment(RefundPaymentRequest) returns (RefundPaymentResponse);
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+}
+
+message ProcessPaymentRequest {
+  string order_id = 1;
+  double amount = 2;
+  string currency = 3;
+  PaymentMethod payment_method = 4;
+}
+
+message ProcessPaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string transaction_id = 3;
+  int64 processed_at = 4;
+}
+
+message RefundPaymentRequest {
+  string payment_id = 1;
+  string reason = 2;
+}
+
+message RefundPaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string refund_transaction_id = 3;
+  int64 refunded_at = 4;
+}
+
+message GetPaymentRequest {
+  string payment_id = 1;
+}
+
+message GetPaymentResponse {
+  string payment_id = 1;
+  string order_id = 2;
+  double amount = 3;
+  string status = 4;
+  string transaction_id = 5;
+  int64 created_at = 6;
+}
+
+message PaymentMethod {
+  string type = 1;  // CREDIT_CARD, DEBIT_CARD, PAYPAL, etc.
+  string last_four_digits = 2;
+}
+
+// ==================== Saga Orchestrator ====================
+
+service SagaOrchestrator {
+  rpc ExecuteSaga(ExecuteSagaRequest) returns (ExecuteSagaResponse);
+  rpc GetSagaStatus(GetSagaStatusRequest) returns (GetSagaStatusResponse);
+}
+
+message ExecuteSagaRequest {
+  string saga_type = 1;  // CREATE_ORDER, UPDATE_ORDER, etc.
+  CreateOrderRequest order_request = 2;
+}
+
+message ExecuteSagaResponse {
+  string saga_id = 1;
+  string status = 2;
+  string order_id = 3;
+  repeated SagaStep steps = 4;
+}
+
+message GetSagaStatusRequest {
+  string saga_id = 1;
+}
+
+message GetSagaStatusResponse {
+  string saga_id = 1;
+  string status = 2;
+  string current_step = 3;
+  repeated SagaStep steps = 4;
+  int64 started_at = 5;
+  int64 completed_at = 6;
+}
+
+message SagaStep {
+  string step_name = 1;
+  string status = 2;
+  int64 started_at = 3;
+  int64 completed_at = 4;
+  string error_message = 5;
+}
