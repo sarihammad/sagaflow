@@ -1,0 +1,64 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Application
+application-local.yml
+application-local.properties
+
+# Docker
+.docker/
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+*.jar
+*.war
+*.ear
+*.class
+
+# Package Files
+*.tar.gz
+*.zip
+
+# Test
+.testcontainers/
+
+# JVM crash logs
+hs_err_pid*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# OS
+Thumbs.db
