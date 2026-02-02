@@ -1,0 +1,239 @@
+groups:
+  - name: sagaflow_alerts
+    interval: 30s
+    rules:
+      # High Latency Alerts
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High P95 latency detected"
+          description: "Service {{ $labels.service }} has P95 latency > 500ms (current: {{ $value }}s)"
+
+      - alert: HighP99Latency
+        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "High P99 latency detected"
+          description: "Service {{ $labels.service }} has P99 latency > 1s (current: {{ $value }}s)"
+
+      # Error Rate Alerts
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_server_requests_seconds_count{status=~"5.."}[5m]) 
+            / 
+            rate(http_server_requests_seconds_count[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: reliability
+        annotations:
+          summary: "High error rate detected"
+          description: "Service {{ $labels.service }} has error rate > 5% (current: {{ $value | humanizePercentage }})"
+
+      - alert: ElevatedErrorRate
+        expr: |
+          (
+            rate(http_server_requests_seconds_count{status=~"5.."}[5m]) 
+            / 
+            rate(http_server_requests_seconds_count[5m])
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          category: reliability
+        annotations:
+          summary: "Elevated error rate"
+          description: "Service {{ $labels.service }} has error rate > 1% (current: {{ $value | humanizePercentage }})"
+
+      # Saga-specific Alerts
+      - alert: SagaFailureRateHigh
+        expr: |
+          (
+            rate(saga_failures_total[5m]) 
+            / 
+            rate(saga_attempts_total[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: saga
+        annotations:
+          summary: "High saga failure rate"
+          description: "Saga failure rate > 5% (current: {{ $value | humanizePercentage }})"
+
+      - alert: SagaCompensationRateHigh
+        expr: |
+          (
+            rate(saga_compensations_total[5m]) 
+            / 
+            rate(saga_attempts_total[5m])
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          category: saga
+        annotations:
+          summary: "High saga compensation rate"
+          description: "Saga compensation rate > 10% (current: {{ $value | humanizePercentage }})"
+
+      # Circuit Breaker Alerts
+      - alert: CircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{state="open"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          category: resilience
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker {{ $labels.name }} in service {{ $labels.service }} is OPEN"
+
+      - alert: CircuitBreakerHalfOpen
+        expr: resilience4j_circuitbreaker_state{state="half_open"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          category: resilience
+        annotations:
+          summary: "Circuit breaker stuck in half-open"
+          description: "Circuit breaker {{ $labels.name }} in service {{ $labels.service }} is stuck in HALF_OPEN for > 5 minutes"
+
+      - alert: HighCircuitBreakerFailureRate
+        expr: |
+          (
+            rate(resilience4j_circuitbreaker_calls_total{kind="failed"}[5m]) 
+            / 
+            rate(resilience4j_circuitbreaker_calls_total[5m])
+          ) > 0.20
+        for: 5m
+        labels:
+          severity: warning
+          category: resilience
+        annotations:
+          summary: "High circuit breaker failure rate"
+          description: "Circuit breaker {{ $labels.name }} failure rate > 20% (current: {{ $value | humanizePercentage }})"
+
+      # Resource Alerts
+      - alert: HighMemoryUsage
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High JVM heap usage"
+          description: "Service {{ $labels.service }} heap usage > 85% (current: {{ $value | humanizePercentage }})"
+
+      - alert: HighGCTime
+        expr: rate(jvm_gc_pause_seconds_sum[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High GC time"
+          description: "Service {{ $labels.service }} spending > 10% time in GC (current: {{ $value | humanizePercentage }})"
+
+      # Database Connection Pool Alerts
+      - alert: DatabaseConnectionPoolExhaustion
+        expr: hikaricp_connections_active / hikaricp_connections_max > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Service {{ $labels.service }} using > 90% of connection pool (current: {{ $value | humanizePercentage }})"
+
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(hikaricp_connections_acquire_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "Slow database connection acquisition"
+          description: "P95 connection acquisition time > 1s (current: {{ $value }}s)"
+
+      # Cache Alerts
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            rate(orders_cache_hits_total[10m]) 
+            / 
+            (rate(orders_cache_hits_total[10m]) + rate(orders_cache_misses_total[10m]))
+          ) < 0.7
+        for: 15m
+        labels:
+          severity: warning
+          category: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate < 70% (current: {{ $value | humanizePercentage }})"
+
+      # Throughput Alerts
+      - alert: LowThroughput
+        expr: rate(http_server_requests_seconds_count[5m]) < 100
+        for: 10m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Low request throughput"
+          description: "Service {{ $labels.service }} throughput < 100 req/s (current: {{ $value }})"
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Service is down"
+          description: "Service {{ $labels.service }} has been down for > 2 minutes"
+
+      # Kafka Alerts
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: messaging
+        annotations:
+          summary: "High Kafka consumer lag"
+          description: "Consumer {{ $labels.consumer }} has lag > 1000 messages (current: {{ $value }})"
+
+      # Payment-specific Alerts
+      - alert: HighPaymentDeclineRate
+        expr: |
+          (
+            rate(payments_failed_total{reason="gateway_declined"}[10m]) 
+            / 
+            rate(payments_attempted_total[10m])
+          ) > 0.15
+        for: 10m
+        labels:
+          severity: warning
+          category: payments
+        annotations:
+          summary: "High payment decline rate"
+          description: "Payment decline rate > 15% (current: {{ $value | humanizePercentage }})"
+
+      # Inventory Alerts
+      - alert: FrequentInventoryShortages
+        expr: rate(inventory_insufficient_total[15m]) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          category: inventory
+        annotations:
+          summary: "Frequent inventory shortages"
+          description: "Inventory shortages occurring > 0.1 times/second for product {{ $labels.product }}"
